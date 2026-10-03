@@ -1,0 +1,12 @@
+{
+  "appId": "app.nklassen.compass",
+  "appName": "Compass",
+  "webDir": "www",
+  "server": {
+    "url": "https://nklassen-app.github.io/kairos-compass/",
+    "allowNavigation": ["nklassen-app.github.io"]
+  },
+  "android": {
+    "allowMixedContent": false
+  }
+}
