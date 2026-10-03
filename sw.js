@@ -1,4 +1,4 @@
-const CACHE = 'compass-v2';   // bump on EVERY content change, and the .ver marker in index.html with it
+const CACHE = 'compass-v3';   // navigations revalidate past the HTTP cache   // bump on EVERY content change, and the .ver marker in index.html with it
 const ASSETS = ['.', 'index.html', 'manifest.webmanifest', 'icon.svg'];
 
 self.addEventListener('install', e => {
@@ -18,10 +18,14 @@ self.addEventListener('activate', e => {
 // launch, no service-worker re-check needed (the Capacitor WebView proved
 // unreliable at those, see kairos-floor). The cache is the offline fallback
 // so the page still opens without signal. Static assets stay cache-first.
+// cache:'no-cache' (2026-10-03): GitHub Pages sends max-age=600, and a plain
+// fetch() answers from the HTTP cache inside those 10 minutes — a deploy did
+// not show on the next open (found on the Whiteboard). 'no-cache' always asks
+// the server first (a 304 when nothing changed).
 self.addEventListener('fetch', e => {
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      fetch(e.request).then(res => {
+      fetch(e.request, { cache: 'no-cache' }).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));
         return res;
