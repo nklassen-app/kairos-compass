@@ -1,6 +1,10 @@
 # Compass
 
-*One paragraph: what this app is, and what it is not.*
+The morning card: my two quarterly goals, why each matters, and one rule
+for today — *if ___, then ___* — written in the morning so a plan made cold
+is in front of me in the heat of the day. It is not Horizons on a phone: no
+cascade, no plans, no programs, no link to Horizons or the Cockpit. No
+streaks or scores. (Epic *Compass* in `kairos-system/BACKLOG.md`.)
 
 Local-first single page, no build step, no dependencies, no account. Hosted on
 GitHub Pages and wrapped in a Capacitor shell for the phone, the same way as
@@ -9,9 +13,19 @@ from `kairos-foundation/templates/phone-app`.
 
 ## The rules
 
-1. *Write the app's few hard rules here, numbered. The rules are the spec.*
-2. State is one JSON document in `localStorage` under `compass:v1`, on one
-   device. No backup, no sync.
+1. **This quarter** holds exactly two goals, each with one line on why it
+   matters. They are typed on the phone, never in this repo — the repo is
+   public and the goals are personal.
+2. **Today** holds one rule: *if ___, then ___*. Both halves are required;
+   it then reads as one sentence for the rest of the day.
+3. Any text is edited by tapping it. Enter or tapping away saves; Escape or
+   an empty field keeps the original — editing never deletes.
+4. The rule belongs to the local calendar day. At midnight the card starts
+   blank again; earlier days' rules are kept on the device (for the midday
+   check-in and evening capture still to come), not shown.
+5. State is one JSON document in `localStorage` under `compass:v1`, on one
+   device: `{ goals: [{text, why}, {text, why}], days: {'YYYY-MM-DD': {if,
+   then, at}} }`. No backup, no sync.
 
 ## Run locally
 

@@ -21,16 +21,34 @@
   .wrap{max-width:520px;margin:0 auto;}
   header{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:22px;}
   h1{font-size:21px;font-weight:650;letter-spacing:-.3px;margin:0;}
-  .count{font-size:14px;font-weight:600;color:var(--graphite);font-variant-numeric:tabular-nums;}
-  .capture{display:flex;gap:8px;margin-bottom:12px;}
-  input{flex:1;font:inherit;font-size:16px;padding:11px 13px;background:#fff;border:1.5px solid var(--edge);border-radius:8px;color:var(--ink);}
-  input:focus{outline:none;border-color:var(--ink);}
-  .add{border:none;background:var(--ink);color:#fff;font:inherit;font-size:15px;font-weight:600;border-radius:8px;padding:0 16px;cursor:pointer;}
+  .day{font-size:14px;font-weight:600;color:var(--graphite);}
+
+  section{margin-bottom:34px;}
+  h2{font-size:13px;font-weight:650;color:var(--graphite);margin:0 0 10px;letter-spacing:.1px;}
+
   .board{border:1.5px solid var(--edge);border-radius:10px;background:#fff;padding:4px 0;}
-  .board.empty{padding:22px 16px;color:var(--graphite);font-size:14px;border-style:dashed;}
-  .row{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;}
-  .row + .row{border-top:1px solid #ecefea;}
-  .task{flex:1;font-size:16px;word-break:break-word;}
+  .goal{display:flex;gap:12px;padding:13px 14px;}
+  .goal + .goal{border-top:1px solid #ecefea;}
+  .num{flex:none;font-size:14px;font-weight:650;color:var(--graphite);width:14px;padding-top:2px;font-variant-numeric:tabular-nums;}
+  .body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+  .text{font-size:17px;font-weight:600;word-break:break-word;cursor:text;}
+  .why{font-size:14px;color:var(--graphite);word-break:break-word;cursor:text;}
+  .empty{color:#9ba09a;font-weight:400;}
+
+  .rule{border:1.5px solid var(--ink);border-radius:10px;background:#fff;padding:16px;font-size:19px;line-height:1.45;word-break:break-word;}
+  .rule .k{font-weight:650;}
+  .rule .part{cursor:text;}
+  .rule .edit{font-size:19px;}
+
+  .form{display:flex;flex-direction:column;gap:8px;}
+  .line{display:flex;align-items:center;gap:10px;}
+  .line label{flex:none;width:38px;font-size:15px;font-weight:650;}
+  input{flex:1;min-width:0;font:inherit;font-size:16px;padding:11px 13px;background:#fff;border:1.5px solid var(--edge);border-radius:8px;color:var(--ink);}
+  input:focus{outline:none;border-color:var(--ink);}
+  .set{align-self:flex-end;border:none;background:var(--ink);color:#fff;font:inherit;font-size:15px;font-weight:600;border-radius:8px;padding:10px 18px;cursor:pointer;margin-top:4px;}
+
+  .edit{flex:1;min-width:0;width:100%;font:inherit;padding:0;margin:0;border:none;border-bottom:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:0;}
+  .edit:focus{outline:none;}
   .note{font-size:13px;color:var(--graphite);margin:10px 2px 0;}
   .ver{position:fixed;right:10px;bottom:8px;font-size:11px;color:var(--graphite);opacity:.6;}
   :focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
@@ -40,55 +58,159 @@
 <div class="wrap">
   <header>
     <h1>Compass</h1>
-    <span class="count" id="count"></span>
+    <span class="day" id="day"></span>
   </header>
+
   <section>
-    <div class="capture">
-      <input id="field" placeholder="Add an item" autocomplete="off" enterkeyhint="done">
-      <button class="add" id="add" type="button">Add</button>
-    </div>
-    <div class="board" id="list"></div>
+    <h2>This quarter</h2>
+    <div class="board" id="goals"></div>
+  </section>
+
+  <section>
+    <h2>Today</h2>
+    <div id="today"></div>
     <p class="note" id="status"></p>
   </section>
 </div>
 <!-- Keep in step with CACHE in sw.js — the visible proof of which build is running. -->
-<span class="ver">compass-v1</span>
+<span class="ver">compass-v2</span>
 
 <script>
 // State: one JSON document in localStorage, on one device. No backup, no sync.
+// The goals and rules are N.'s own and are typed here — never in the repo.
+//   goals: two of { text, why }
+//   days:  { 'YYYY-MM-DD': { if, then, at } } — one rule per local day; past
+//          days are kept for the midday and evening steps (C2, C3).
 const KEY = 'compass:v1';
-let state = { items: [] };
+const GOALS = 2;
+let state = { goals: [], days: {} };
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+// The local calendar day — the rule turns over at midnight where N. is.
+const today = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 
 function load(){
   try { const raw = localStorage.getItem(KEY); if (raw) state = JSON.parse(raw); }
   catch (e) { $('status').textContent = 'Starting fresh.'; }
+  if (!Array.isArray(state.goals)) state.goals = [];
+  while (state.goals.length < GOALS) state.goals.push({ text: '', why: '' });
+  if (!state.days || typeof state.days !== 'object') state.days = {};
   render();
 }
 function save(){
   try { localStorage.setItem(KEY, JSON.stringify(state)); $('status').textContent = ''; }
   catch (e) { $('status').textContent = 'Not saved — this browser is blocking storage.'; }
 }
-function render(){
-  $('count').textContent = state.items.length ? String(state.items.length) : '';
-  const l = $('list');
-  if (!state.items.length){ l.className = 'board empty'; l.textContent = 'Nothing here yet.'; return; }
-  l.className = 'board';
-  l.innerHTML = state.items.map(t => `<div class="row" data-row="${t.id}"><span class="task">${esc(t.text)}</span></div>`).join('');
+
+// Every editable piece of text is addressed by a path: g0.text, g1.why,
+// rule.if, rule.then. Placeholders show what belongs there until it is typed.
+const PLACEHOLDER = {
+  text: i => `Quarterly goal ${i + 1} — tap to write it`,
+  why: () => 'Why it matters — tap to write it',
+};
+function getText(path){
+  const [where, field] = path.split('.');
+  if (where === 'rule') return (state.days[today()] || {})[field] || '';
+  return state.goals[+where.slice(1)][field] || '';
 }
-function add(){
-  const field = $('field'); const text = field.value.trim();
-  if (!text) return;
-  state.items.push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text });
-  field.value = ''; field.focus();
+function setText(path, text){
+  const [where, field] = path.split('.');
+  if (where === 'rule') state.days[today()][field] = text;
+  else state.goals[+where.slice(1)][field] = text;
+}
+
+function render(){
+  $('day').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+
+  $('goals').innerHTML = state.goals.slice(0, GOALS).map((g, i) => `
+    <div class="goal">
+      <span class="num">${i + 1}</span>
+      <div class="body">
+        <span class="text${g.text ? '' : ' empty'}" data-edit="g${i}.text">${esc(g.text || PLACEHOLDER.text(i))}</span>
+        <span class="why${g.why ? '' : ' empty'}" data-edit="g${i}.why">${esc(g.why || PLACEHOLDER.why())}</span>
+      </div>
+    </div>`).join('');
+
+  const rule = state.days[today()];
+  const t = $('today');
+  if (rule && rule.if && rule.then){
+    t.innerHTML = `<p class="rule" id="rule"><span class="k">If</span> <span class="part" data-edit="rule.if">${esc(rule.if)}</span>, <span class="k">then</span> <span class="part" data-edit="rule.then">${esc(rule.then)}</span>.</p>`;
+  } else {
+    t.innerHTML = `
+      <div class="form">
+        <div class="line"><label for="if">If</label><input id="if" placeholder="the moment that pulls me off" autocomplete="off" enterkeyhint="next"></div>
+        <div class="line"><label for="then">then</label><input id="then" placeholder="what I do instead" autocomplete="off" enterkeyhint="done"></div>
+        <button class="set" id="set" type="button">Set today's rule</button>
+      </div>`;
+  }
+}
+
+// The rule needs both halves; a trailing full stop or comma is dropped so
+// the sentence reads once, however it was typed.
+const clean = s => s.trim().replace(/[.,;]+$/, '').trim();
+function setRule(){
+  const ifText = clean($('if').value), thenText = clean($('then').value);
+  if (!ifText || !thenText){
+    $('status').textContent = 'A rule needs both: if … and then ….';
+    (ifText ? $('then') : $('if')).focus();
+    return;
+  }
+  state.days[today()] = { if: ifText, then: thenText, at: Date.now() };
   render(); save();
 }
-$('add').addEventListener('click', add);
-$('field').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); add(); } });
+
+// Tap any text to edit it in place. Enter or tapping away saves; Escape or
+// an empty field leaves the original untouched — editing never deletes.
+function startEdit(span){
+  const path = span.dataset.edit;
+  const before = getText(path);
+  const input = document.createElement('input');
+  input.className = 'edit';
+  input.value = before;
+  input.placeholder = span.classList.contains('empty') ? span.textContent.replace(/ — tap to write it$/, '') : '';
+  input.setAttribute('aria-label', 'Edit');
+  let finished = false;
+  const finish = commit => {
+    if (finished) return;
+    finished = true;
+    const text = path.startsWith('rule.') ? clean(input.value) : input.value.trim();
+    if (commit && text && text !== before){ setText(path, text); save(); }
+    render();
+  };
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); finish(true); }
+    if (e.key === 'Escape'){ e.preventDefault(); finish(false); }
+  });
+  input.addEventListener('blur', () => finish(true));
+  span.replaceWith(input);
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#set')){ setRule(); return; }
+  const edit = e.target.closest('[data-edit]');
+  if (edit) startEdit(edit);
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (e.target.id === 'if'){ e.preventDefault(); $('then').focus(); }
+  else if (e.target.id === 'then'){ e.preventDefault(); setRule(); }
+});
 
 load();
+// A new day starts blank even if the app was left open overnight: coming
+// back to the foreground re-renders against today's date — unless a field
+// is being typed in, which a re-render would throw away.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  const a = document.activeElement;
+  if (!(a && a.tagName === 'INPUT')) render();
+});
 // updateViaCache:'none' keeps the HTTP cache out of sw.js checks, and every
 // return to the foreground forces one — for WebViews that skip the re-check.
 if ('serviceWorker' in navigator) {
