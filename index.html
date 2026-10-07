@@ -49,6 +49,17 @@
 
   .edit{flex:1;min-width:0;width:100%;font:inherit;padding:0;margin:0;border:none;border-bottom:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:0;}
   .edit:focus{outline:none;}
+  .quote{margin:0 0 30px;padding:0 2px;}
+  .quote blockquote{margin:0;font-family:Georgia,"Times New Roman",serif;font-size:17px;line-height:1.5;}
+  .quote figcaption{margin-top:6px;font-size:13px;color:var(--graphite);}
+
+  .one{margin-top:14px;}
+  .one .k{font-size:13px;font-weight:650;color:var(--graphite);display:block;margin-bottom:4px;}
+  .one .done{font-size:17px;font-weight:600;word-break:break-word;cursor:text;}
+  .one .edit{font-size:17px;}
+  .one .line{gap:8px;}
+  .one .set{margin-top:0;}
+
   .note{font-size:13px;color:var(--graphite);margin:10px 2px 0;}
   .ver{position:fixed;right:10px;bottom:8px;font-size:11px;color:var(--graphite);opacity:.6;}
   :focus-visible{outline:2px solid var(--blue);outline-offset:2px;}
@@ -61,6 +72,8 @@
     <span class="day" id="day"></span>
   </header>
 
+  <figure class="quote" id="quote"></figure>
+
   <section>
     <h2>This quarter</h2>
     <div class="board" id="goals"></div>
@@ -69,21 +82,94 @@
   <section>
     <h2>Today</h2>
     <div id="today"></div>
+    <div class="one" id="one"></div>
     <p class="note" id="status"></p>
   </section>
 </div>
 <!-- Keep in step with CACHE in sw.js — the visible proof of which build is running. -->
-<span class="ver">compass-v3</span>
+<span class="ver">compass-v4</span>
 
 <script>
 // State: one JSON document in localStorage, on one device. No backup, no sync.
 // The goals and rules are N.'s own and are typed here — never in the repo.
 //   goals: two of { text, why }
-//   days:  { 'YYYY-MM-DD': { if, then, at } } — one rule per local day; past
-//          days are kept for the midday and evening steps (C2, C3).
+//   days:  { 'YYYY-MM-DD': { if, then, at, one } } — one rule and one thing
+//          per local day; past days are kept for the midday and evening
+//          steps (Compass 2 and 3).
 const KEY = 'compass:v1';
 const GOALS = 2;
 let state = { goals: [], days: {} };
+
+// Marcus Aurelius, *Meditations*, George Long's translation (1862, public
+// domain), verbatim from the Standard Ebooks edition (CC0). Each passage is
+// at most three sentences; [book, text]. The edition does not number the
+// sections, so a passage is cited by book only.
+const QUOTES = [
+  ["II", "Through not observing what is in the mind of another a man has seldom been seen to be unhappy; but those who do not observe the movements of their own minds must of necessity be unhappy."],
+  ["IV", "Let no act be done without a purpose, nor otherwise than according to the perfect principles of art."],
+  ["IV", "Take away thy opinion, and then there is taken away the complaint, “I have been harmed.” Take away the complaint, “I have been harmed,” and the harm is taken away."],
+  ["IV", "That which does not make a man worse than he was, also does not make his life worse, nor does it harm him either from without or from within."],
+  ["IV", "Do not have such an opinion of things as he has who does thee wrong, or such as he wishes thee to have, but look at them as they are in truth."],
+  ["IV", "Do not act as if thou wert going to live ten thousand years. Death hangs over thee. While thou livest, while it is in thy power, be good."],
+  ["IV", "Do not be whirled about, but in every movement have respect to justice, and on the occasion of every impression maintain the faculty of comprehension or understanding."],
+  ["IV", "Love the art, poor as it may be, which thou hast learned, and be content with it; and pass through the rest of life like one who has entrusted to the gods with his whole soul all that he has, making thyself neither the tyrant nor the slave of any man."],
+  ["IV", "Everything is only for a day, both that which remembers and that which is remembered."],
+  ["IV", "Thou wilt soon die, and thou art not yet simple, not free from perturbations, nor without suspicion of being hurt by external things, nor kindly disposed towards all; nor dost thou yet place wisdom only in acting justly."],
+  ["IV", "Time is like a river made up of the events which happen, and a violent stream; for as soon as a thing has been seen, it is carried away, and another comes in its place, and this will be carried away too."],
+  ["IV", "Be like the promontory against which the waves continually break, but it stands firm and tames the fury of the water around it."],
+  ["IV", "Always run to the short way; and the short way is the natural: accordingly say and do everything in conformity with the soundest reason. For such a purpose frees a man from trouble, and warfare, and all artifice and ostentatious display."],
+  ["V", "How easy it is to repel and to wipe away every impression which is troublesome or unsuitable, and immediately to be in all tranquility."],
+  ["V", "Things themselves touch not the soul, not in the least degree; nor have they admission to the soul, nor can they turn or move the soul: but the soul turns and moves itself alone, and whatever judgements it may think proper to make, such it makes for itself the things which present themselves to it."],
+  ["VI", "Look within. Let neither the peculiar quality of anything nor its value escape thee."],
+  ["VI", "The best way of avenging thyself is not to become like the wrong doer."],
+  ["VI", "Take pleasure in one thing and rest in it, in passing from one social act to another social act, thinking of God."],
+  ["VI", "When thou hast been compelled by circumstances to be disturbed in a manner, quickly return to thyself and do not continue out of tune longer than the compulsion lasts; for thou wilt have more mastery over the harmony by continually recurring to it."],
+  ["VI", "If a thing is difficult to be accomplished by thyself, do not think that it is impossible for man: but if anything is possible for man and conformable to his nature, think that this can be attained by thyself too."],
+  ["VI", "If any man is able to convince me and show me that I do not think or act right, I will gladly change; for I seek the truth by which no man was ever injured. But he is injured who abides in his error and ignorance."],
+  ["VI", "Adapt thyself to the things with which thy lot has been cast: and the men among whom thou hast received thy portion, love them, but do it truly, sincerely."],
+  ["VI", "It is in our power to have no opinion about a thing, and not to be disturbed in our soul; for things themselves have no natural power to form our judgements."],
+  ["VI", "Accustom thyself to attend carefully to what is said by another, and as much as it is possible, be in the speaker’s mind."],
+  ["VI", "That which is not good for the swarm, neither is it good for the bee."],
+  ["VI", "No man will hinder thee from living according to the reason of thy own nature: nothing will happen to thee contrary to the reason of the universal nature."],
+  ["VII", "Let not future things disturb thee, for thou wilt come to them, if it shall be necessary, having with thee the same reason which now thou usest for present things."],
+  ["VII", "Whatever anyone does or says, I must be good, just as if the gold, or the emerald, or the purple were always saying this. Whatever anyone does or says, I must be emerald and keep my colour."],
+  ["VII", "Retire into thyself. The rational principle which rules has this nature, that it is content with itself when it does what is just, and so secures tranquility."],
+  ["VII", "Everywhere and at all times it is in thy power piously to acquiesce in thy present condition, and to behave justly to those who are about thee, and to exert thy skill upon thy present thoughts, that nothing shall steal into them without being well examined."],
+  ["VII", "Consider thyself to be dead, and to have completed thy life up to the present time; and live according to nature the remainder which is allowed thee."],
+  ["VII", "Love that only which happens to thee and is spun with the thread of thy destiny. For what is more suitable?"],
+  ["VII", "Look within. Within is the fountain of good, and it will ever bubble up, if thou wilt ever dig."],
+  ["VII", "The art of life is more like the wrestler’s art than the dancer’s, in respect of this, that it should stand ready and firm to meet onsets which are sudden and unexpected."],
+  ["VII", "The perfection of moral character consists in this, in passing every day as the last, and in being neither violently excited nor torpid nor playing the hypocrite."],
+  ["VII", "When thou hast done a good act and another has received it, why dost thou look for a third thing besides these, as fools do, either to have the reputation of having done a good act or to obtain a return?"],
+  ["VII", "No man is tired of receiving what is useful. But it is useful to act according to nature. Do not then be tired of receiving what is useful by doing it to others."],
+  ["VIII", "Remember that to change thy opinion and to follow him who corrects thy error is as consistent with freedom as it is to persist in thy error. For it is thy own, the activity which is exerted according to thy own movement and judgement, and indeed according to thy own understanding too."],
+  ["VIII", "Attend to the matter which is before thee, whether it is an opinion or an act or a word."],
+  ["VIII", "Thou sufferest this justly: for thou choosest rather to become good tomorrow than to be good today."],
+  ["VIII", "Speak both in the senate and to every man, whoever he may be, appropriately, not with any affectation: use plain discourse."],
+  ["VIII", "Receive wealth or prosperity without arrogance; and be ready to let it go."],
+  ["VIII", "Different things delight different people. But it is my delight to keep the ruling faculty sound without turning away either from any man or from any of the things which happen to men, but looking at and receiving all with welcome eyes and using everything according to its value."],
+  ["VIII", "Neither in thy actions be sluggish nor in thy conversation without method, nor wandering in thy thoughts, nor let there be in thy soul inward contention nor external effusion, nor in life be so busy as to have no leisure."],
+  ["VIII", "Men exist for the sake of one another. Teach them then or bear with them."],
+  ["IX", "He who does wrong does wrong against himself. He who acts unjustly acts unjustly to himself, because he makes himself bad."],
+  ["IX", "Thy present opinion founded on understanding, and thy present conduct directed to social good, and thy present disposition of contentment with everything which happens—that is enough."],
+  ["IX", "Wipe out imagination; check desire; extinguish appetite; keep the ruling faculty in its own power."],
+  ["IX", "Labour not as one who is wretched, nor yet as one who would be pitied or admired: but direct thy will to one thing only, to put thyself in motion and to check thyself, as the social reason requires."],
+  ["IX", "Today I have got out of all trouble, or rather I have cast out all trouble, for it was not outside, but within and in my opinions."],
+  ["IX", "It is thy duty to leave another man’s wrongful act there where it is."],
+  ["IX", "If any man has done wrong, the harm is his own. But perhaps he has not done wrong."],
+  ["X", "If a man is mistaken, instruct him kindly and show him his error. But if thou art not able, blame thyself, or blame not even thyself."],
+  ["X", "No longer talk at all about the kind of man that a good man ought to be, but be such."],
+  ["X", "Accustom thyself as much as possible on the occasion of anything being done by any person to inquire with thyself, For what object is this man doing this? But begin with thyself, and examine thyself first."],
+  ["XI", "Have I done something for the general interest? Well then I have had my reward. Let this always be present to thy mind, and never stop doing such good."],
+  ["XI", "How plain does it appear that there is not another condition of life so well suited for philosophising as this in which thou now happenest to be."],
+  ["XI", "In the writings of the Ephesians there was this precept, constantly to think of some one of the men of former times who practised virtue."],
+  ["XI", "Neither in writing nor in reading wilt thou be able to lay down rules for others before thou shalt have first learned to obey rules thyself. Much more is this so in life."],
+  ["XII", "Practise thyself even in the things which thou despairest of accomplishing. For even the left hand, which is ineffectual for all other things for want of practice, holds the bridle more vigorously than the right hand; for it has been practised in this."],
+  ["XII", "How ridiculous and what a stranger he is who is surprised at anything which happens in life."],
+  ["XII", "First, do nothing inconsiderately, nor without a purpose. Second, make thy acts refer to nothing else than to a social end."],
+  ["XII", "Consider that everything is opinion, and opinion is in thy power. Take away then, when thou choosest, thy opinion, and like a mariner, who has doubled the promontory, thou wilt find calm, everything stable, and a waveless bay."],
+  ["XII", "Cast away opinion: thou art saved. Who then hinders thee from casting it away?"],
+];
 
 const $ = id => document.getElementById(id);
 const esc = s => s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -114,16 +200,26 @@ const PLACEHOLDER = {
 };
 function getText(path){
   const [where, field] = path.split('.');
-  if (where === 'rule') return (state.days[today()] || {})[field] || '';
+  if (where === 'rule' || where === 'day') return (state.days[today()] || {})[field] || '';
   return state.goals[+where.slice(1)][field] || '';
 }
 function setText(path, text){
   const [where, field] = path.split('.');
-  if (where === 'rule') state.days[today()][field] = text;
+  if (where === 'rule' || where === 'day') state.days[today()][field] = text;
   else state.goals[+where.slice(1)][field] = text;
 }
 
+// The day's quote: picked from the date, so it is the same every time the
+// app opens that day and another one tomorrow — nothing to store.
+function quoteFor(day){
+  let h = 2166136261;
+  for (const c of day) h = Math.imul(h ^ c.charCodeAt(0), 16777619);
+  return QUOTES[(h >>> 0) % QUOTES.length];
+}
+
 function render(){
+  const [book, words] = quoteFor(today());
+  $('quote').innerHTML = `<blockquote>${esc(words)}</blockquote><figcaption>Marcus Aurelius, <i>Meditations</i>, Book ${book}</figcaption>`;
   $('day').textContent = new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 
   $('goals').innerHTML = state.goals.slice(0, GOALS).map((g, i) => `
@@ -147,6 +243,12 @@ function render(){
         <button class="set" id="set" type="button">Set today's rule</button>
       </div>`;
   }
+
+  const one = (state.days[today()] || {}).one;
+  $('one').innerHTML = one
+    ? `<span class="k">One thing today</span><span class="done" id="one-text" data-edit="day.one">${esc(one)}</span>`
+    : `<label class="k" for="one-in">One thing I will do today to advance my goals</label>
+       <div class="line"><input id="one-in" placeholder="the one thing" autocomplete="off" enterkeyhint="done"><button class="set" id="set-one" type="button">Set</button></div>`;
 }
 
 // The rule needs both halves; a trailing full stop or comma is dropped so
@@ -159,7 +261,14 @@ function setRule(){
     (ifText ? $('then') : $('if')).focus();
     return;
   }
-  state.days[today()] = { if: ifText, then: thenText, at: Date.now() };
+  // Merge, so a one thing set earlier today is kept.
+  state.days[today()] = { ...state.days[today()], if: ifText, then: thenText, at: Date.now() };
+  render(); save();
+}
+function setOne(){
+  const text = $('one-in').value.trim();
+  if (!text){ $('one-in').focus(); return; }
+  state.days[today()] = { ...state.days[today()], one: text };
   render(); save();
 }
 
@@ -193,6 +302,7 @@ function startEdit(span){
 
 document.addEventListener('click', e => {
   if (e.target.closest('#set')){ setRule(); return; }
+  if (e.target.closest('#set-one')){ setOne(); return; }
   const edit = e.target.closest('[data-edit]');
   if (edit) startEdit(edit);
 });
@@ -200,6 +310,7 @@ document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (e.target.id === 'if'){ e.preventDefault(); $('then').focus(); }
   else if (e.target.id === 'then'){ e.preventDefault(); setRule(); }
+  else if (e.target.id === 'one-in'){ e.preventDefault(); setOne(); }
 });
 
 load();
