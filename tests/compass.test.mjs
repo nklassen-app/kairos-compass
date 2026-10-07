@@ -16,12 +16,20 @@ const SW = readFileSync(path.join(ROOT, 'sw.js'), 'utf8');
 const KEY = 'compass:v1';
 
 // Boot the page. `seed` pre-populates localStorage (values are JSON-encoded).
-function boot({ seed = {} } = {}) {
+// `now` (ms) pins the page's clock, to try another day.
+function boot({ seed = {}, now } = {}) {
   const dom = new JSDOM(HTML, {
     url: 'http://localhost/',
     runScripts: 'dangerously',
     pretendToBeVisual: true,
     beforeParse(window) {
+      if (now != null) {
+        const Real = window.Date;
+        window.Date = class extends Real {
+          constructor(...a) { super(...(a.length ? a : [now])); }
+          static now() { return now; }
+        };
+      }
       for (const [k, v] of Object.entries(seed)) window.localStorage.setItem(k, JSON.stringify(v));
     },
   });
@@ -131,4 +139,84 @@ test('the version marker matches the service-worker cache name', () => {
   const { $ } = boot();
   const cache = SW.match(/const CACHE = '([^']+)'/)[1];
   assert.equal($('.ver').textContent, cache);
+});
+
+// The quote list, read from the page source the way the page holds it.
+const QUOTES = JSON.parse(HTML.match(/const QUOTES = (\[[\s\S]*?\n\]);/)[1].replace(/,\n\]$/, ']'));
+const sentences = t => t.match(/[.!?]+[”’)]?(?=\s|—|$)/g) || [];
+
+test("the day's quote sits at the top, with its book", () => {
+  const t = boot();
+  const quote = t.$('#quote');
+  assert.ok(quote.compareDocumentPosition(t.$('#goals')) & t.w.Node.DOCUMENT_POSITION_FOLLOWING);
+  const words = quote.querySelector('blockquote').textContent;
+  const hit = QUOTES.find(([, q]) => q === words);
+  assert.ok(hit, 'the quote is one from the list');
+  assert.equal(quote.querySelector('figcaption').textContent, `Marcus Aurelius, Meditations, Book ${hit[0]}`);
+});
+
+test('the quote stays the same all day and changes across days', () => {
+  const day0 = new Date(2026, 9, 7, 7, 0).getTime();
+  const shown = ms => boot({ now: ms }).$('#quote blockquote').textContent;
+  assert.equal(shown(day0), shown(day0 + 14 * 3600000));  // 7:00 and 21:00
+  const fortnight = new Set(Array.from({ length: 14 }, (_, i) => shown(day0 + i * 86400000)));
+  assert.ok(fortnight.size >= 8, `only ${fortnight.size} different quotes in 14 days`);
+});
+
+test('every quote is at most three sentences', () => {
+  assert.ok(QUOTES.length >= 50);
+  for (const [book, q] of QUOTES) {
+    assert.match(book, /^[IVX]+$/);
+    const n = sentences(q).length;
+    assert.ok(n >= 1 && n <= 3, `${n} sentences: ${q}`);
+  }
+});
+
+test('one thing today is written, read back, and stored by date', () => {
+  const t = boot();
+  t.$('#one-in').value = '  Sand the lamp-room rail  ';
+  t.$('#set-one').click();
+  assert.equal(t.$('#one-text').textContent, 'Sand the lamp-room rail');
+  assert.equal(t.$('#one-in'), null);
+  assert.equal(t.stored().days[TODAY].one, 'Sand the lamp-room rail');
+});
+
+test('setting the rule after the one thing keeps both', () => {
+  const t = boot();
+  t.$('#one-in').value = 'Sand the lamp-room rail';
+  t.$('#set-one').click();
+  setRule(t, 'a storm rolls in', 'I trim the wick');
+  const day = t.stored().days[TODAY];
+  assert.equal(day.one, 'Sand the lamp-room rail');
+  assert.equal(day.then, 'I trim the wick');
+  assert.equal(t.$('#one-text').textContent, 'Sand the lamp-room rail');
+});
+
+test('the one thing is changed by tapping, and an empty edit keeps it', () => {
+  const t = boot({ seed: { [KEY]: { goals: GOALS, days: { [TODAY]: { if: 'a', then: 'b', at: 1, one: 'Oil the hinges' } } } } });
+  editAndPress(t, '#one-text', 'Oil the foghorn hinges');
+  assert.equal(t.$('#one-text').textContent, 'Oil the foghorn hinges');
+  editAndPress(t, '#one-text', '  ');
+  assert.equal(t.$('#one-text').textContent, 'Oil the foghorn hinges');
+  assert.equal(t.stored().days[TODAY].if, 'a');
+});
+
+test("yesterday's one thing is kept but a new day starts blank", () => {
+  const t = boot({ seed: { [KEY]: { goals: GOALS, days: { [YESTERDAY]: { if: 'x', then: 'y', at: 1, one: 'Old task' } } } } });
+  assert.equal(t.$('#one-text'), null);
+  assert.ok(t.$('#one-in'));
+  assert.equal(t.stored().days[TODAY], undefined);  // nothing written just by opening
+  t.$('#one-in').value = 'New task';
+  t.$('#one-in').dispatchEvent(new t.w.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+  const days = t.stored().days;
+  assert.equal(days[YESTERDAY].one, 'Old task');
+  assert.equal(days[TODAY].one, 'New task');
+});
+
+test('an empty one thing is not set', () => {
+  const t = boot();
+  t.$('#one-in').value = '   ';
+  t.$('#set-one').click();
+  assert.ok(t.$('#one-in'));
+  assert.equal(t.stored(), null);
 });
