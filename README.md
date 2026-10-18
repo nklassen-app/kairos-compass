@@ -1,8 +1,9 @@
 # Compass
 
-The morning card: my two quarterly goals, why each matters, and one rule
+The morning card: a line from Marcus Aurelius, my two quarterly goals, why each matters, and one rule
 for today — *if ___, then ___* — written in the morning so a plan made cold
-is in front of me in the heat of the day. It is not Horizons on a phone: no
+is in front of me in the heat of the day — and the one thing I will do today
+to advance my goals. It is not Horizons on a phone: no
 cascade, no plans, no programs, no link to Horizons or the Cockpit. No
 streaks or scores. (Epic *Compass* in `kairos-system/BACKLOG.md`.)
 
@@ -13,19 +14,26 @@ from `kairos-foundation/templates/phone-app`.
 
 ## The rules
 
-1. **This quarter** holds exactly two goals, each with one line on why it
+1. **At the top**, a passage from Marcus Aurelius's *Meditations* — at most
+   three sentences, cited by book. It is picked from the date: the same all
+   day, another tomorrow. The passages ship in the page (George Long's 1862
+   translation, public domain, verbatim from the Standard Ebooks edition,
+   CC0); no call goes out for them.
+2. **This quarter** holds exactly two goals, each with one line on why it
    matters. They are typed on the phone, never in this repo — the repo is
    public and the goals are personal.
-2. **Today** holds one rule: *if ___, then ___*. Both halves are required;
+3. **Today** holds one rule: *if ___, then ___*. Both halves are required;
    it then reads as one sentence for the rest of the day.
-3. Any text is edited by tapping it. Enter or tapping away saves; Escape or
+4. Any text is edited by tapping it. Enter or tapping away saves; Escape or
    an empty field keeps the original — editing never deletes.
-4. The rule belongs to the local calendar day. At midnight the card starts
+5. Under the rule, **one thing I will do today to advance my goals**: typed
+   once, then read as a sentence and changed by tapping, like the rule.
+6. The rule and the one thing belong to the local calendar day. At midnight the card starts
    blank again; earlier days' rules are kept on the device (for the midday
    check-in and evening capture still to come), not shown.
-5. State is one JSON document in `localStorage` under `compass:v1`, on one
+7. State is one JSON document in `localStorage` under `compass:v1`, on one
    device: `{ goals: [{text, why}, {text, why}], days: {'YYYY-MM-DD': {if,
-   then, at}} }`. No backup, no sync.
+   then, at, one}} }`. No backup, no sync.
 
 ## Run locally
 
